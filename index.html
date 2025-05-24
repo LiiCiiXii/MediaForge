@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaForge - Media Format Converter</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .logo-text {
+            font-size: 3rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .upload-area {
+            border: 3px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .upload-area:hover {
+            border-color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+            transform: translateY(-5px);
+        }
+
+        .upload-area.dragover {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+        }
+
+        .upload-text {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            opacity: 0.7;
+            font-size: 1rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .files-section {
+            display: none;
+        }
+
+        .files-title {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+
+        .file-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .file-preview.video {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .file-preview.audio {
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+        }
+
+        .file-preview.image {
+            background: linear-gradient(45deg, #45b7d1, #96ceb4);
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            word-break: break-word;
+        }
+
+        .file-details {
+            opacity: 0.7;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .file-settings {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .setting-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .select, .slider {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .select option {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .slider {
+            width: 100px;
+        }
+
+        .quality-display {
+            font-size: 0.9rem;
+            font-weight: 600;
+            min-width: 40px;
+        }
+
+        .file-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(78, 205, 196, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .progress-container {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .feature {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+
+        .feature-icon.video {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .feature-icon.audio {
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+        }
+
+        .feature-icon.image {
+            background: linear-gradient(45deg, #45b7d1, #96ceb4);
+        }
+
+        .feature h3 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .feature p {
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+        }
+
+        .notification.error {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .notification.info {
+            background: linear-gradient(45deg, #45b7d1, #96ceb4);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .logo-text {
+                font-size: 2rem;
+            }
+
+            .file-item {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .file-settings {
+                justify-content: center;
+            }
+
+            .file-actions {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spinning {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-magic"></i>
+                </div>
+                <h1 class="logo-text">MediaForge</h1>
+            </div>
+            <p class="subtitle">Transform your media files instantly - Convert videos, audio, and images with ease</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <div class="upload-text">Drop your files here</div>
+                <div class="upload-subtext">or click to browse (supports video, audio, and images)</div>
+                <input type="file" id="fileInput" class="file-input" multiple accept="video/*,audio/*,image/*">
+            </div>
+        </div>
+
+        <!-- Files Section -->
+        <div class="files-section" id="filesSection">
+            <div class="card">
+                <h2 class="files-title">Your Files (<span id="fileCount">0</span>)</h2>
+                <div id="filesList"></div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon video">
+                    <i class="fas fa-video"></i>
+                </div>
+                <h3>Video Conversion</h3>
+                <p>Convert between MP4, AVI, MOV, MKV, WebM and more. Adjust quality, resolution, and frame rate for perfect results.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon audio">
+                    <i class="fas fa-music"></i>
+                </div>
+                <h3>Audio Conversion</h3>
+                <p>Transform audio files to MP3, WAV, FLAC, AAC, OGG with customizable bitrate and quality settings.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon image">
+                    <i class="fas fa-image"></i>
+                </div>
+                <h3>Image Conversion</h3>
+                <p>Convert images between JPEG, PNG, WebP, GIF, BMP, TIFF with advanced compression control.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="javascript.js"></script>
+</body>
+</html>
