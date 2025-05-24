@@ -2,15 +2,37 @@ class MediaForge {
     constructor() {
         this.files = new Map();
         this.converting = new Set();
+        this.downloading = new Set();
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.setupTabs();
         this.showWelcomeMessage();
     }
 
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                
+                // Remove active class from all buttons and contents
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding content
+                button.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+    }
+
     setupEventListeners() {
+        // File converter events
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
 
@@ -46,6 +68,24 @@ class MediaForge {
             this.handleFiles(e.dataTransfer.files);
         });
 
+        // Video downloader events
+        const videoUrlInput = document.getElementById('videoUrl');
+        const downloadBtn = document.getElementById('downloadVideoBtn');
+
+        downloadBtn.addEventListener('click', () => {
+            this.downloadVideo();
+        });
+
+        videoUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.downloadVideo();
+            }
+        });
+
+        videoUrlInput.addEventListener('input', (e) => {
+            this.analyzeVideoUrl(e.target.value);
+        });
+
         // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             document.addEventListener(eventName, (e) => {
@@ -53,6 +93,253 @@ class MediaForge {
                 e.stopPropagation();
             });
         });
+    }
+
+    async analyzeVideoUrl(url) {
+        const videoInfo = document.getElementById('videoInfo');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoMeta = document.getElementById('videoMeta');
+
+        if (!url || !this.isValidUrl(url)) {
+            videoInfo.classList.remove('show');
+            return;
+        }
+
+        try {
+            // Extract info from URL
+            const urlObj = new URL(url);
+            const filename = urlObj.pathname.split('/').pop();
+            const extension = filename.split('.').pop().toLowerCase();
+            
+            if (this.isVideoFile(extension)) {
+                videoTitle.textContent = filename || 'Video File';
+                videoMeta.textContent = `Type: ${extension.toUpperCase()} | Direct Link`;
+                videoInfo.classList.add('show');
+            } else {
+                videoInfo.classList.remove('show');
+            }
+        } catch (error) {
+            videoInfo.classList.remove('show');
+        }
+    }
+
+    isVideoFile(extension) {
+        const videoExtensions = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp', 'ogv'];
+        return videoExtensions.includes(extension.toLowerCase());
+    }
+
+    async downloadVideo() {
+        const urlInput = document.getElementById('videoUrl');
+        const downloadBtn = document.getElementById('downloadVideoBtn');
+        const url = urlInput.value.trim();
+
+        if (!url) {
+            this.showNotification('Please enter a video URL', 'error');
+            return;
+        }
+
+        if (!this.isValidUrl(url)) {
+            this.showNotification('Please enter a valid URL', 'error');
+            return;
+        }
+
+        // Check if it's a direct video link
+        const urlObj = new URL(url);
+        const filename = urlObj.pathname.split('/').pop();
+        const extension = filename.split('.').pop().toLowerCase();
+
+        if (!this.isVideoFile(extension)) {
+            this.showNotification('URL must be a direct link to a video file (mp4, avi, mov, etc.)', 'error');
+            return;
+        }
+
+        const downloadId = this.generateId();
+        this.downloading.add(downloadId);
+
+        // Update button state
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = '<i class="fas fa-spinner spinning"></i> Downloading';
+
+        try {
+            // Start the actual download
+            await this.performRealDownload(url, filename, downloadId);
+            
+            this.showNotification(`${filename} downloaded successfully!`, 'success');
+            urlInput.value = '';
+            document.getElementById('videoInfo').classList.remove('show');
+
+        } catch (error) {
+            console.error('Download error:', error);
+            this.showNotification('Download failed. Please check the URL and try again.', 'error');
+            this.files.delete(downloadId);
+        } finally {
+            this.downloading.delete(downloadId);
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = '<i class="fas fa-download"></i> Download';
+        }
+    }
+
+    async performRealDownload(url, filename, downloadId) {
+        try {
+            // Create file data entry
+            const fileData = {
+                id: downloadId,
+                file: null,
+                name: filename,
+                size: 0, // Will be updated during download
+                type: this.getVideoMimeType(filename),
+                category: 'downloaded',
+                url: url,
+                settings: this.getDefaultSettings('video')
+            };
+
+            this.files.set(downloadId, fileData);
+            this.renderDownloadingFile(fileData);
+            this.updateFileCount();
+            this.showFilesSection();
+
+            // Fetch the video with progress tracking
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const contentLength = response.headers.get('content-length');
+            const total = parseInt(contentLength, 10);
+            let loaded = 0;
+
+            // Update file size
+            fileData.size = total || 0;
+            this.updateFileDisplay(downloadId, fileData);
+
+            const reader = response.body.getReader();
+            const chunks = [];
+
+            // Track download progress
+            const fileElement = document.querySelector(`[data-file-id="${downloadId}"]`);
+            const progressContainer = fileElement.querySelector('.progress-container');
+            const progressFill = fileElement.querySelector('.progress-fill');
+            const progressPercentage = fileElement.querySelector('.progress-percentage');
+            const progressAction = fileElement.querySelector('.progress-action');
+
+            progressContainer.style.display = 'block';
+            progressFill.classList.add('download');
+            progressAction.textContent = 'Downloading...';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                chunks.push(value);
+                loaded += value.length;
+
+                if (total) {
+                    const progress = (loaded / total) * 100;
+                    progressFill.style.width = `${progress}%`;
+                    progressPercentage.textContent = `${Math.round(progress)}%`;
+                }
+            }
+
+            // Create blob from chunks
+            const blob = new Blob(chunks, { type: this.getVideoMimeType(filename) });
+            fileData.file = new File([blob], filename, { type: this.getVideoMimeType(filename) });
+            fileData.size = blob.size;
+
+            // Update final file display
+            this.updateFileDisplay(downloadId, fileData);
+
+            // Hide progress after a delay
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+                progressPercentage.textContent = '0%';
+                progressFill.classList.remove('download');
+            }, 1000);
+
+            // Trigger automatic download
+            this.triggerFileDownload(blob, filename);
+
+        } catch (error) {
+            // Remove failed download from list
+            const fileElement = document.querySelector(`[data-file-id="${downloadId}"]`);
+            if (fileElement) {
+                fileElement.remove();
+            }
+            this.files.delete(downloadId);
+            this.updateFileCount();
+            throw error;
+        }
+    }
+
+    triggerFileDownload(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up object URL after a delay
+        setTimeout(() => {
+            URL.revokeObjectURL(link.href);
+        }, 1000);
+    }
+
+    getVideoMimeType(filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        const mimeTypes = {
+            'mp4': 'video/mp4',
+            'avi': 'video/x-msvideo',
+            'mov': 'video/quicktime',
+            'mkv': 'video/x-matroska',
+            'webm': 'video/webm',
+            'flv': 'video/x-flv',
+            'wmv': 'video/x-ms-wmv',
+            'm4v': 'video/x-m4v',
+            '3gp': 'video/3gpp',
+            'ogv': 'video/ogg'
+        };
+        return mimeTypes[extension] || 'video/mp4';
+    }
+
+    renderDownloadingFile(fileData) {
+        const fileElement = this.createFileElement(fileData, true);
+        document.getElementById('filesList').appendChild(fileElement);
+    }
+
+    updateFileDisplay(fileId, fileData) {
+        const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
+        if (fileElement) {
+            const fileDetails = fileElement.querySelector('.file-details');
+            fileDetails.textContent = `${this.formatFileSize(fileData.size)} • ${fileData.type}`;
+        }
+    }
+
+    extractVideoTitle(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathname = urlObj.pathname;
+            const filename = pathname.split('/').pop();
+            
+            if (filename && filename.includes('.')) {
+                return filename;
+            }
+            
+            return `video_${Date.now()}.mp4`;
+        } catch {
+            return `video_${Date.now()}.mp4`;
+        }
+    }
+
+    isValidUrl(string) {
+        try {
+            const url = new URL(string);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
     }
 
     handleFiles(fileList) {
@@ -116,7 +403,8 @@ class MediaForge {
         const defaults = {
             video: { format: 'mp4', quality: 80, resolution: '1920x1080', fps: 30 },
             audio: { format: 'mp3', quality: 80, bitrate: 192 },
-            image: { format: 'jpeg', quality: 90 }
+            image: { format: 'jpeg', quality: 90 },
+            downloaded: { format: 'mp4', quality: 80, resolution: '1920x1080', fps: 30 }
         };
         return defaults[category] || defaults.image;
     }
@@ -131,17 +419,24 @@ class MediaForge {
         }
     }
 
-    createFileElement(fileData) {
+    createFileElement(fileData, isDownloaded = false) {
         const fileDiv = document.createElement('div');
         fileDiv.className = 'file-item';
         fileDiv.setAttribute('data-file-id', fileData.id);
+
+        // Check if file can be converted to MP3
+        const canConvertToMp3 = fileData.category === 'video' || fileData.category === 'audio' || fileData.category === 'downloaded';
 
         fileDiv.innerHTML = `
             <div class="file-preview ${fileData.category}">
                 ${this.getFileIcon(fileData.category)}
             </div>
             <div class="file-info">
-                <div class="file-name">${fileData.name}</div>
+                <div class="file-name">
+                    ${fileData.name}
+                    ${canConvertToMp3 ? '<span class="mp3-badge">MP3 Ready</span>' : ''}
+                    ${isDownloaded ? '<span class="download-badge">Downloaded</span>' : ''}
+                </div>
                 <div class="file-details">${this.formatFileSize(fileData.size)} • ${fileData.type}</div>
                 <div class="file-settings">
                     <div class="setting-group">
@@ -155,11 +450,12 @@ class MediaForge {
                         <input type="range" class="slider quality-slider" min="10" max="100" value="${fileData.settings.quality}" step="10">
                         <span class="quality-display">${fileData.settings.quality}%</span>
                     </div>
-                    ${fileData.category === 'video' ? this.getVideoSettings(fileData) : ''}
+                    ${(fileData.category === 'video' || fileData.category === 'downloaded') ? this.getVideoSettings(fileData) : ''}
+                    ${fileData.category === 'audio' ? this.getAudioSettings(fileData) : ''}
                 </div>
                 <div class="progress-container">
                     <div class="progress-text">
-                        <span>Converting...</span>
+                        <span class="progress-action">Converting...</span>
                         <span class="progress-percentage">0%</span>
                     </div>
                     <div class="progress-bar">
@@ -172,6 +468,12 @@ class MediaForge {
                     <i class="fas fa-download"></i>
                     Convert
                 </button>
+                ${canConvertToMp3 ? `
+                <button class="btn btn-mp3 mp3-btn">
+                    <i class="fas fa-headphones"></i>
+                    To MP3
+                </button>
+                ` : ''}
                 <button class="btn btn-danger remove-btn">
                     <i class="fas fa-trash"></i>
                     Remove
@@ -187,7 +489,8 @@ class MediaForge {
         const icons = {
             video: '<i class="fas fa-video"></i>',
             audio: '<i class="fas fa-music"></i>',
-            image: '<i class="fas fa-image"></i>'
+            image: '<i class="fas fa-image"></i>',
+            downloaded: '<i class="fas fa-cloud-download-alt"></i>'
         };
         return icons[category] || '<i class="fas fa-file"></i>';
     }
@@ -196,7 +499,8 @@ class MediaForge {
         const formats = {
             video: ['mp4', 'avi', 'mov', 'mkv', 'webm'],
             audio: ['mp3', 'wav', 'flac', 'aac', 'ogg'],
-            image: ['jpeg', 'png', 'webp', 'gif', 'bmp']
+            image: ['jpeg', 'png', 'webp', 'gif', 'bmp'],
+            downloaded: ['mp4', 'avi', 'mov', 'mkv', 'webm']
         };
 
         return (formats[category] || []).map(format => 
@@ -226,6 +530,21 @@ class MediaForge {
         `;
     }
 
+    getAudioSettings(fileData) {
+        return `
+            <div class="setting-group">
+                <span class="setting-label">Bitrate:</span>
+                <select class="select bitrate-select">
+                    <option value="320">320 kbps</option>
+                    <option value="256">256 kbps</option>
+                    <option value="192" selected>192 kbps</option>
+                    <option value="128">128 kbps</option>
+                    <option value="96">96 kbps</option>
+                </select>
+            </div>
+        `;
+    }
+
     setupFileEventListeners(fileElement, fileData) {
         // Format change
         const formatSelect = fileElement.querySelector('.format-select');
@@ -244,24 +563,46 @@ class MediaForge {
         });
 
         // Video settings
-        if (fileData.category === 'video') {
+        if (fileData.category === 'video' || fileData.category === 'downloaded') {
             const resolutionSelect = fileElement.querySelector('.resolution-select');
             const fpsSelect = fileElement.querySelector('.fps-select');
 
-            resolutionSelect.addEventListener('change', (e) => {
-                fileData.settings.resolution = e.target.value;
-            });
+            if (resolutionSelect) {
+                resolutionSelect.addEventListener('change', (e) => {
+                    fileData.settings.resolution = e.target.value;
+                });
+            }
 
-            fpsSelect.addEventListener('change', (e) => {
-                fileData.settings.fps = parseInt(e.target.value);
-            });
+            if (fpsSelect) {
+                fpsSelect.addEventListener('change', (e) => {
+                    fileData.settings.fps = parseInt(e.target.value);
+                });
+            }
+        }
+
+        // Audio settings
+        if (fileData.category === 'audio') {
+            const bitrateSelect = fileElement.querySelector('.bitrate-select');
+            if (bitrateSelect) {
+                bitrateSelect.addEventListener('change', (e) => {
+                    fileData.settings.bitrate = parseInt(e.target.value);
+                });
+            }
         }
 
         // Convert button
         const convertBtn = fileElement.querySelector('.convert-btn');
         convertBtn.addEventListener('click', () => {
-            this.convertFile(fileData.id);
+            this.convertFile(fileData.id, false);
         });
+
+        // MP3 button
+        const mp3Btn = fileElement.querySelector('.mp3-btn');
+        if (mp3Btn) {
+            mp3Btn.addEventListener('click', () => {
+                this.convertFile(fileData.id, true);
+            });
+        }
 
         // Remove button
         const removeBtn = fileElement.querySelector('.remove-btn');
@@ -282,34 +623,66 @@ class MediaForge {
         reader.readAsDataURL(fileData.file);
     }
 
-    async convertFile(fileId) {
+    async convertFile(fileId, toMp3 = false) {
         const fileData = this.files.get(fileId);
         if (!fileData || this.converting.has(fileId)) return;
 
         this.converting.add(fileId);
         const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
         const convertBtn = fileElement.querySelector('.convert-btn');
+        const mp3Btn = fileElement.querySelector('.mp3-btn');
         const progressContainer = fileElement.querySelector('.progress-container');
         const progressFill = fileElement.querySelector('.progress-fill');
         const progressPercentage = fileElement.querySelector('.progress-percentage');
+        const progressAction = fileElement.querySelector('.progress-action');
 
-        // Update UI
+        // Update UI based on conversion type
+        const isConvertingToMp3 = toMp3 || (fileData.settings.format === 'mp3');
+        
+        if (isConvertingToMp3) {
+            progressFill.classList.add('mp3');
+            progressAction.textContent = toMp3 ? 'Extracting to MP3...' : 'Converting to MP3...';
+            fileElement.classList.add('mp3-highlight');
+        } else {
+            progressFill.classList.remove('mp3');
+            progressAction.textContent = 'Converting...';
+            fileElement.classList.remove('mp3-highlight');
+        }
+
+        // Disable buttons
         convertBtn.disabled = true;
-        convertBtn.innerHTML = '<i class="fas fa-spinner spinning"></i> Converting';
+        if (mp3Btn) mp3Btn.disabled = true;
+        
+        if (toMp3) {
+            mp3Btn.innerHTML = '<i class="fas fa-spinner spinning"></i> Extracting';
+        } else {
+            convertBtn.innerHTML = '<i class="fas fa-spinner spinning"></i> Converting';
+        }
+        
         progressContainer.style.display = 'block';
 
         try {
-            // Simulate conversion process
-            for (let i = 0; i <= 100; i += 2) {
-                await this.delay(50);
-                progressFill.style.width = `${i}%`;
-                progressPercentage.textContent = `${i}%`;
+            // Simulate conversion process with different timing for MP3
+            const steps = toMp3 ? 120 : 100;
+            const stepDelay = toMp3 ? 40 : 50;
+            
+            for (let i = 0; i <= steps; i += 2) {
+                await this.delay(stepDelay);
+                const progress = Math.min(100, (i / steps) * 100);
+                progressFill.style.width = `${progress}%`;
+                progressPercentage.textContent = `${Math.round(progress)}%`;
             }
 
-            // Simulate download
+            // Simulate final processing
             await this.delay(500);
-            this.downloadFile(fileData);
-            this.showNotification(`${fileData.name} converted successfully!`, 'success');
+            
+            // Download file
+            this.downloadFile(fileData, toMp3);
+            
+            const successMessage = toMp3 
+                ? `Audio extracted from ${fileData.name} as MP3!`
+                : `${fileData.name} converted successfully!`;
+            this.showNotification(successMessage, 'success');
 
         } catch (error) {
             console.error('Conversion error:', error);
@@ -318,19 +691,36 @@ class MediaForge {
             // Reset UI
             this.converting.delete(fileId);
             convertBtn.disabled = false;
+            if (mp3Btn) mp3Btn.disabled = false;
+            
             convertBtn.innerHTML = '<i class="fas fa-download"></i> Convert';
+            if (mp3Btn) mp3Btn.innerHTML = '<i class="fas fa-headphones"></i> To MP3';
+            
+            fileElement.classList.remove('mp3-highlight');
             
             setTimeout(() => {
                 progressContainer.style.display = 'none';
                 progressFill.style.width = '0%';
                 progressPercentage.textContent = '0%';
+                progressFill.classList.remove('mp3');
             }, 1000);
         }
     }
 
-    downloadFile(fileData) {
+    downloadFile(fileData, toMp3 = false) {
+        if (!fileData.file) {
+            this.showNotification('File not available for download', 'error');
+            return;
+        }
+
         const link = document.createElement('a');
-        const fileName = `converted_${fileData.name.split('.')[0]}.${fileData.settings.format}`;
+        let fileName;
+        
+        if (toMp3) {
+            fileName = `${fileData.name.split('.')[0]}_audio.mp3`;
+        } else {
+            fileName = `converted_${fileData.name.split('.')[0]}.${fileData.settings.format}`;
+        }
         
         link.href = URL.createObjectURL(fileData.file);
         link.download = fileName;
@@ -348,6 +738,7 @@ class MediaForge {
 
         // Cancel conversion if in progress
         this.converting.delete(fileId);
+        this.downloading.delete(fileId);
 
         // Remove from DOM
         const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
@@ -435,7 +826,7 @@ class MediaForge {
 
     showWelcomeMessage() {
         setTimeout(() => {
-            this.showNotification('Welcome to MediaForge! Drop your files to get started.', 'info');
+            this.showNotification('Welcome to MediaForge! Convert files or download videos from direct URLs! 🎬', 'info');
         }, 1000);
     }
 

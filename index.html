@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaForge - Media Format Converter</title>
+    <title>MediaForge - Media Format Converter & Video Downloader</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -66,6 +66,51 @@
             margin-bottom: 30px;
         }
 
+        .tabs-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 5px;
+            gap: 5px;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(45deg, #4ecdc4, #44bd87);
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+        }
+
+        .tab-button:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
@@ -98,18 +143,84 @@
             transform: scale(1.02);
         }
 
-        .upload-icon {
+        .download-area {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .url-input-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+            box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
+        }
+
+        .url-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .download-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-icon, .download-icon {
             font-size: 4rem;
             margin-bottom: 20px;
             color: #4ecdc4;
         }
 
-        .upload-text {
+        .download-icon {
+            color: #ff6b6b;
+        }
+
+        .upload-text, .download-text {
             font-size: 1.5rem;
             margin-bottom: 10px;
         }
 
-        .upload-subtext {
+        .upload-subtext, .download-subtext {
             opacity: 0.7;
             font-size: 1rem;
         }
@@ -166,6 +277,10 @@
 
         .file-preview.image {
             background: linear-gradient(45deg, #45b7d1, #96ceb4);
+        }
+
+        .file-preview.downloaded {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
         }
 
         .file-preview img {
@@ -252,6 +367,7 @@
             justify-content: center;
             gap: 8px;
             min-width: 120px;
+            font-size: 0.9rem;
         }
 
         .btn-primary {
@@ -265,6 +381,22 @@
         }
 
         .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-mp3 {
+            background: linear-gradient(45deg, #ff9500, #ff6b35);
+            color: white;
+        }
+
+        .btn-mp3:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 149, 0, 0.3);
+        }
+
+        .btn-mp3:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
@@ -301,6 +433,14 @@
             border-radius: 4px;
         }
 
+        .progress-fill.mp3 {
+            background: linear-gradient(45deg, #ff9500, #ff6b35);
+        }
+
+        .progress-fill.download {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
         .progress-text {
             display: flex;
             justify-content: space-between;
@@ -310,7 +450,7 @@
 
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 30px;
             margin-top: 40px;
         }
@@ -350,6 +490,14 @@
 
         .feature-icon.image {
             background: linear-gradient(45deg, #45b7d1, #96ceb4);
+        }
+
+        .feature-icon.mp3 {
+            background: linear-gradient(45deg, #ff9500, #ff6b35);
+        }
+
+        .feature-icon.download {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
         }
 
         .feature h3 {
@@ -393,6 +541,100 @@
             background: linear-gradient(45deg, #45b7d1, #96ceb4);
         }
 
+        .mp3-highlight {
+            background: linear-gradient(45deg, rgba(255, 149, 0, 0.1), rgba(255, 107, 53, 0.1));
+            border: 1px solid rgba(255, 149, 0, 0.3);
+        }
+
+        .download-highlight {
+            background: linear-gradient(45deg, rgba(155, 89, 182, 0.1), rgba(142, 68, 173, 0.1));
+            border: 1px solid rgba(155, 89, 182, 0.3);
+        }
+
+        .supported-sites {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .site-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .site-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .site-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+
+        .mp3-badge {
+            background: linear-gradient(45deg, #ff9500, #ff6b35);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .download-badge {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .video-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .video-info.show {
+            display: block;
+        }
+
+        .video-thumbnail {
+            width: 120px;
+            height: 68px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .video-details {
+            flex: 1;
+        }
+
+        .video-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .video-meta {
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -400,6 +642,15 @@
 
             .logo-text {
                 font-size: 2rem;
+            }
+
+            .tab-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .url-input-container {
+                flex-direction: column;
             }
 
             .file-item {
@@ -414,6 +665,13 @@
             .file-actions {
                 flex-direction: row;
                 justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                min-width: 100px;
+                font-size: 0.8rem;
+                padding: 10px 15px;
             }
         }
 
@@ -437,18 +695,86 @@
                 </div>
                 <h1 class="logo-text">MediaForge</h1>
             </div>
-            <p class="subtitle">Transform your media files instantly - Convert videos, audio, and images with ease</p>
+            <p class="subtitle">Transform your media files instantly - Convert, extract, and download with ease</p>
         </div>
 
-        <!-- Upload Section -->
-        <div class="card">
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">
-                    <i class="fas fa-cloud-upload-alt"></i>
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="converter">
+                    <i class="fas fa-exchange-alt"></i>
+                    File Converter
+                </button>
+                <button class="tab-button" data-tab="downloader">
+                    <i class="fas fa-download"></i>
+                    Video Downloader
+                </button>
+            </div>
+        </div>
+
+        <!-- File Converter Tab -->
+        <div class="tab-content active" id="converter">
+            <div class="card">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Drop your files here</div>
+                    <div class="upload-subtext">or click to browse (supports video, audio, and images)</div>
+                    <input type="file" id="fileInput" class="file-input" multiple accept="video/*,audio/*,image/*">
                 </div>
-                <div class="upload-text">Drop your files here</div>
-                <div class="upload-subtext">or click to browse (supports video, audio, and images)</div>
-                <input type="file" id="fileInput" class="file-input" multiple accept="video/*,audio/*,image/*">
+            </div>
+        </div>
+
+        <!-- Video Downloader Tab -->
+        <div class="tab-content" id="downloader">
+            <div class="card">
+                <div class="download-area">
+                    <div class="download-icon">
+                        <i class="fas fa-cloud-download-alt"></i>
+                    </div>
+                    <div class="download-text">Download Videos from Direct URLs</div>
+                    <div class="download-subtext">Paste a direct video URL and download it instantly</div>
+                    
+                    <div class="url-input-container">
+                        <input type="url" id="videoUrl" class="url-input" placeholder="Paste direct video URL here (e.g., https://example.com/video.mp4)">
+                        <button class="download-btn" id="downloadVideoBtn">
+                            <i class="fas fa-download"></i>
+                            Download
+                        </button>
+                    </div>
+
+                    <div class="video-info" id="videoInfo">
+                        <div style="display: flex; align-items: center;">
+                            <div class="video-thumbnail">
+                                <i class="fas fa-video" style="font-size: 2rem; color: #ff6b6b;"></i>
+                            </div>
+                            <div class="video-details">
+                                <div class="video-title" id="videoTitle">Video Title</div>
+                                <div class="video-meta" id="videoMeta">Size: Unknown | Type: Unknown</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="supported-sites">
+                        <div class="site-item">
+                            <div class="site-icon"><i class="fas fa-link"></i></div>
+                            <div>Direct MP4 Links</div>
+                        </div>
+                        <div class="site-item">
+                            <div class="site-icon"><i class="fas fa-server"></i></div>
+                            <div>Media Servers</div>
+                        </div>
+                        <div class="site-item">
+                            <div class="site-icon"><i class="fas fa-archive"></i></div>
+                            <div>Archive.org</div>
+                        </div>
+                        <div class="site-item">
+                            <div class="site-icon"><i class="fas fa-globe"></i></div>
+                            <div>Public CDNs</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -475,6 +801,20 @@
                 </div>
                 <h3>Audio Conversion</h3>
                 <p>Transform audio files to MP3, WAV, FLAC, AAC, OGG with customizable bitrate and quality settings.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon mp3">
+                    <i class="fas fa-headphones"></i>
+                </div>
+                <h3>Extract to MP3</h3>
+                <p>Extract audio from any video file and convert to high-quality MP3. Perfect for music, podcasts, and audio content.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon download">
+                    <i class="fas fa-cloud-download-alt"></i>
+                </div>
+                <h3>Video Downloader</h3>
+                <p>Download videos from direct URLs, media servers, and public domain sources. Works with any direct video link.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon image">
